@@ -7,13 +7,13 @@ app_color = "#e74c3c"
 app_email = "hello@frappe.io"
 app_license = "GNU General Public License (v3)"
 source_link = "https://github.com/frappe/erpnext"
-app_logo_url = "/assets/erpnext/images/erpnext-logo.svg"
+app_logo_url = "/assets/indentos/images/indentos-icon.svg"
 app_home = "/desk/home"
 
 add_to_apps_screen = [
 	{
 		"name": app_name,
-		"logo": "/assets/erpnext/images/erpnext-logo.svg",
+		"logo": "/assets/indentos/images/indentos-icon.svg",
 		"title": app_title,
 		"route": app_home,
 		"setup_wizard_text": "Let's give your business a home.",
@@ -142,7 +142,7 @@ website_generators = ["BOM", "Sales Partner"]
 
 website_context = {
 	"favicon": "/assets/erpnext/images/erpnext-favicon.svg",
-	"splash_image": "/assets/erpnext/images/erpnext-logo.svg",
+	"splash_image": "/assets/indentos/images/indentos-wordmark.svg",
 }
 
 # nosemgrep
@@ -564,7 +564,7 @@ scheduler_events = {
 	],
 }
 
-email_brand_image = "assets/erpnext/images/erpnext-logo.jpg"
+email_brand_image = "assets/indentos/images/indentos-wordmark.png"
 
 default_mail_footer = """
 	<span>
