@@ -413,3 +413,139 @@ class TestGeneralLedger(FrappeTestCase):
 		jv.insert()
 		jv.submit()
 		return jv
+<<<<<<< HEAD
+=======
+
+	def test_company_currency_amounts_for_foreign_currency_account(self):
+		account = frappe.get_doc(
+			doctype="Account",
+			account_name="Test USD Account for Company Currency",
+			company=self.company,
+			parent_account="Bank Accounts - _TC",
+			account_type="Bank",
+			account_currency="USD",
+		).insert(ignore_if_duplicate=True)
+		jv = frappe.new_doc("Journal Entry", posting_date=today(), company=self.company, multi_currency=1)
+		jv.append(
+			"accounts", {"account": account.name, "debit_in_account_currency": 100, "exchange_rate": 80}
+		)
+		jv.append("accounts", {"account": "Cash - _TC", "credit_in_account_currency": 8000})
+		jv.submit()
+
+		filters = frappe._dict(
+			company=self.company,
+			from_date=today(),
+			to_date=today(),
+			account=[account.name],
+			show_amount_in_company_currency=1,
+		)
+		total = next(r for r in execute(filters)[1] if r.get("account") == "'Total'")
+
+		self.assertEqual(total["debit"], 8000)
+		self.assertEqual(total["presentation_currency"], "INR")
+
+		filters.update(show_amount_in_company_currency=0, presentation_currency="USD")
+		total = next(r for r in execute(filters)[1] if r.get("account") == "'Total'")
+		self.assertEqual(total["debit"], 100)
+
+	def test_convert_at_reporting_date_rate_for_foreign_currency_account(self):
+		from erpnext.accounts.report import utils as report_utils
+
+		account = frappe.get_doc(
+			doctype="Account",
+			account_name="Test USD Account for Reporting Date Rate",
+			company=self.company,
+			parent_account="Bank Accounts - _TC",
+			account_type="Bank",
+			account_currency="USD",
+		).insert(ignore_if_duplicate=True)
+		jv = frappe.new_doc(
+			"Journal Entry", posting_date=add_days(today(), -10), company=self.company, multi_currency=1
+		)
+		jv.append(
+			"accounts", {"account": account.name, "debit_in_account_currency": 100, "exchange_rate": 80}
+		)
+		jv.append("accounts", {"account": "Cash - _TC", "credit_in_account_currency": 8000})
+		jv.submit()
+
+		frappe.db.delete("Currency Exchange", {"from_currency": "USD", "to_currency": "INR"})
+		frappe.get_doc(
+			doctype="Currency Exchange",
+			date=today(),
+			from_currency="USD",
+			to_currency="INR",
+			exchange_rate=100,
+		).insert()
+		exchange_rates = getattr(report_utils, "__exchange_rates")
+		exchange_rates.clear()
+		self.addCleanup(exchange_rates.clear)
+
+		filters = frappe._dict(
+			company=self.company,
+			from_date=add_days(today(), -5),
+			to_date=today(),
+			account=[account.name],
+		)
+		opening = next(r for r in execute(filters)[1] if r.get("account") == "'Opening'")
+		self.assertEqual(opening["debit"], 100)
+
+		filters.update(convert_at_reporting_date_rate=1, presentation_currency=None)
+		opening = next(r for r in execute(filters)[1] if r.get("account") == "'Opening'")
+		self.assertEqual(opening["debit"], 80)
+		self.assertEqual(opening["presentation_currency"], "USD")
+
+	def test_presentation_currency_without_exchange_rate(self):
+		from erpnext.accounts.doctype.journal_entry.test_journal_entry import make_journal_entry
+		from erpnext.accounts.report import utils as report_utils
+
+		for from_currency, to_currency in (("USD", "INR"), ("INR", "USD")):
+			frappe.db.delete(
+				"Currency Exchange", {"from_currency": from_currency, "to_currency": to_currency}
+			)
+		frappe.db.set_single_value("Currency Exchange Settings", "disabled", 1)
+		exchange_rates = getattr(report_utils, "__exchange_rates")
+		exchange_rates.clear()
+		self.addCleanup(exchange_rates.clear)
+		jv = make_journal_entry("_Test Bank - _TC", "_Test Cash - _TC", 8000, submit=True)
+		filters = frappe._dict(
+			company=self.company,
+			from_date=today(),
+			to_date=today(),
+			account=["_Test Bank - _TC"],
+			voucher_no=jv.name,
+			presentation_currency="USD",
+		)
+
+		self.assertRaisesRegex(
+			frappe.ValidationError, "Exchange rate from .*USD.* to .*INR", execute, filters
+		)
+
+		frappe.get_doc(
+			doctype="Currency Exchange",
+			date=today(),
+			from_currency="USD",
+			to_currency="INR",
+			exchange_rate=80,
+		).insert()
+		total = next(r for r in execute(filters)[1] if r.get("account") == "'Total'")
+		self.assertEqual(total["debit"], 100)
+
+	def test_categorize_by_voucher_separates_voucher_types(self):
+		from erpnext.accounts.doctype.journal_entry.test_journal_entry import make_journal_entry
+
+		self.clear_old_entries()
+		shared_name = "_Test GL Shared Voucher Name"
+		jv = make_journal_entry("_Test Bank - _TC", "_Test Cash - _TC", 300, save=False)
+		jv.insert(set_name=shared_name)
+		jv.submit()
+		si = create_sales_invoice(company=self.company, rate=1000, do_not_save=True)
+		si.insert(set_name=shared_name)
+		si.submit()
+
+		filters = frappe._dict(
+			company=self.company, from_date=today(), to_date=today(), categorize_by="Categorize by Voucher"
+		)
+		total_debits = [r["debit"] for r in execute(filters)[1] if r.get("account") == "'Total'"]
+
+		self.assertEqual(sorted(total_debits[:-1]), [300, 1000])
+>>>>>>> e8ae93e (feat(general ledger): convert at reporting date exchange rate for foreign currency accounts)
